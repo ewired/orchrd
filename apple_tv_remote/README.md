@@ -58,6 +58,10 @@ report whole. Travel still queued when the finger reverses, pauses, clicks or
 lifts is dropped rather than finished, so one gesture never moves the pointer
 into the next one.
 
+The remote's own buttons become key presses: the flatscreen glyph (source) is
+Tab, volume up and down are the media volume keys, Play/Pause is Enter and Menu
+is `1`.
+
 Holding Siri starts capturing microphone audio into the published source.
 Releasing waits for late Bluetooth packets and the final PipeWire buffers to
 deliver the tail, submits the recording to Orchrd, and restores the previous

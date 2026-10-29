@@ -201,8 +201,8 @@ pub fn run(options: Options) -> Result<()> {
                     }
                     match parse_report(&report) {
                         Some(InputReport::Buttons(report)) => {
-                            // The click and Play/Pause/Menu bits live in the
-                            // same report as the Siri bit.
+                            // The click and button bits live in the same
+                            // report as the Siri bit.
                             mouse.process(report, Instant::now());
                             on_siri(
                                 siri_pressed(report),

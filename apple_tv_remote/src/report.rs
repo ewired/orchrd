@@ -31,8 +31,8 @@ const ATT_REPORT_HANDLE: [u8; 2] = [0x23, 0x00];
 pub enum InputReport<'a> {
     /// Encoded microphone audio: sequence counter and Opus payload.
     Opus { sequence: u16, payload: &'a [u8] },
-    /// Two byte button report; bit 0x10 is Siri and the click, Play/Pause and
-    /// Menu bits are read by the touchpad.
+    /// Two byte button report; bit 0x10 is Siri and the remaining button bits
+    /// are read by the touchpad.
     Buttons(&'a [u8]),
     /// Multiplexed touchpad/button input report.
     Touch(&'a [u8]),

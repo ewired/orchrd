@@ -224,13 +224,15 @@ fn click_does_not_emit_motion() {
 }
 
 #[test]
-fn play_pause_and_menu_become_key_events_once() {
+fn remote_keys_become_key_events_once() {
     let mut harness = Harness::new();
-    harness.send(0.02, None, None, 0x08);
-    harness.send(0.02, None, None, 0x08);
-    harness.send(0.02, None, None, 0x00);
-    harness.send(0.02, None, None, 0x20);
-    harness.send(0.02, None, None, 0x00);
+    // Repeats of a held bit must not repeat the key, and several bits may be
+    // held at once, as Volume Up + Menu are when pairing the remote.
+    for buttons in [
+        0x01, 0x01, 0x00, 0x02, 0x00, 0x04, 0x00, 0x08, 0x00, 0x20, 0x00, 0x22, 0x00,
+    ] {
+        harness.send(0.02, None, None, buttons);
+    }
     let events: Vec<Recorded> = harness
         .recorder()
         .events
@@ -241,22 +243,45 @@ fn play_pause_and_menu_become_key_events_once() {
     assert_eq!(
         events,
         vec![
+            Recorded::RemoteKey(RemoteKey::Source, true),
+            Recorded::RemoteKey(RemoteKey::Source, false),
+            Recorded::RemoteKey(RemoteKey::VolumeUp, true),
+            Recorded::RemoteKey(RemoteKey::VolumeUp, false),
+            Recorded::RemoteKey(RemoteKey::VolumeDown, true),
+            Recorded::RemoteKey(RemoteKey::VolumeDown, false),
             Recorded::RemoteKey(RemoteKey::PlayPause, true),
             Recorded::RemoteKey(RemoteKey::PlayPause, false),
             Recorded::RemoteKey(RemoteKey::Menu, true),
+            Recorded::RemoteKey(RemoteKey::Menu, false),
+            Recorded::RemoteKey(RemoteKey::VolumeUp, true),
+            Recorded::RemoteKey(RemoteKey::Menu, true),
+            Recorded::RemoteKey(RemoteKey::VolumeUp, false),
             Recorded::RemoteKey(RemoteKey::Menu, false),
         ]
     );
 }
 
 #[test]
+fn the_source_bit_is_read_from_touch_reports_too() {
+    let mut harness = Harness::new();
+    let (x, y) = center();
+    harness.send(0.02, Some(x), Some(y), 0);
+    harness.send(0.02, Some(x), Some(y), 0x01);
+    assert_eq!(harness.recorder().remote_key(RemoteKey::Source), vec![true]);
+}
+
+#[test]
 fn release_clears_held_buttons() {
     let mut harness = Harness::new();
     let (x, y) = center();
-    harness.send(0.02, Some(x), Some(y), 0x80);
+    harness.send(0.02, Some(x), Some(y), 0x80 | 0x01);
     harness.pad.release();
     harness.pad.release();
     assert_eq!(harness.recorder().keys(Button::Left), vec![true, false]);
+    assert_eq!(
+        harness.recorder().remote_key(RemoteKey::Source),
+        vec![true, false]
+    );
 }
 
 #[test]

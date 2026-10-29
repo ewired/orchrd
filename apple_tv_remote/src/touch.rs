@@ -8,7 +8,11 @@ use std::time::Instant;
 
 use crate::layout::{Interpolator, Region, TouchZones, ZoneConfig, PAD_SIZE_MM};
 
-/// A1513 button mask: Play/Pause, Menu and a mechanical click.
+/// A1513 button byte (the second byte of every report): Source, volume,
+/// Play/Pause and Menu, plus Siri and a mechanical click.
+const BUTTON_SOURCE: u8 = 0x01;
+const BUTTON_VOLUME_UP: u8 = 0x02;
+const BUTTON_VOLUME_DOWN: u8 = 0x04;
 const BUTTON_PLAY: u8 = 0x08;
 const BUTTON_MENU: u8 = 0x20;
 const BUTTON_CLICK: u8 = 0x80;
@@ -28,12 +32,43 @@ pub enum Button {
     Right,
 }
 
-/// Keys other than the touchpad click.
+/// Keys other than the touchpad click. Siri is absent: holding it drives
+/// dictation instead of a key.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RemoteKey {
+    /// The flatscreen glyph button.
+    Source,
+    VolumeUp,
+    VolumeDown,
     PlayPause,
     Menu,
 }
+
+impl RemoteKey {
+    /// Every key the button byte reports, in its bit order.
+    pub const ALL: [RemoteKey; 5] = [
+        RemoteKey::Source,
+        RemoteKey::VolumeUp,
+        RemoteKey::VolumeDown,
+        RemoteKey::PlayPause,
+        RemoteKey::Menu,
+    ];
+
+    /// Button byte bit that reports this key.
+    const fn mask(self) -> u8 {
+        match self {
+            RemoteKey::Source => BUTTON_SOURCE,
+            RemoteKey::VolumeUp => BUTTON_VOLUME_UP,
+            RemoteKey::VolumeDown => BUTTON_VOLUME_DOWN,
+            RemoteKey::PlayPause => BUTTON_PLAY,
+            RemoteKey::Menu => BUTTON_MENU,
+        }
+    }
+}
+
+/// Every bit of the button byte a [`RemoteKey`] owns.
+const REMOTE_KEY_MASK: u8 =
+    BUTTON_SOURCE | BUTTON_VOLUME_UP | BUTTON_VOLUME_DOWN | BUTTON_PLAY | BUTTON_MENU;
 
 /// Outputs of the touch state machine, expressed without evdev codes so the
 /// pad logic stays device agnostic.
@@ -178,8 +213,8 @@ pub struct TouchPad<S: InputSink> {
     /// Arrival-clock origin the interpolator measures deadlines from.
     clock_origin: Option<Instant>,
     button_down: bool,
-    play_down: bool,
-    menu_down: bool,
+    /// Button byte bits of the remote keys currently held.
+    keys_down: u8,
     pub stats: Stats,
 }
 
@@ -213,8 +248,7 @@ impl<S: InputSink> TouchPad<S> {
             interpolator: Interpolator::new(config.interpolation_s),
             clock_origin: None,
             button_down: false,
-            play_down: false,
-            menu_down: false,
+            keys_down: 0,
             stats: Stats::default(),
         })
     }
@@ -436,16 +470,13 @@ impl<S: InputSink> TouchPad<S> {
     }
 
     fn update_remote_keys(&mut self, buttons: u8) {
-        for (mask, key, down) in [
-            (BUTTON_PLAY, RemoteKey::PlayPause, &mut self.play_down),
-            (BUTTON_MENU, RemoteKey::Menu, &mut self.menu_down),
-        ] {
-            let pressed = buttons & mask != 0;
-            if pressed != *down {
+        for key in RemoteKey::ALL {
+            let pressed = buttons & key.mask() != 0;
+            if pressed != (self.keys_down & key.mask() != 0) {
                 self.sink.emit(Output::RemoteKey { key, down: pressed });
-                *down = pressed;
             }
         }
+        self.keys_down = buttons & REMOTE_KEY_MASK;
     }
 
     /// Return the tracked finger in a touch report without changing state.
@@ -477,15 +508,12 @@ impl<S: InputSink> TouchPad<S> {
         self.click_corner = false;
         self.previous_touch = None;
         self.last_arrival = None;
-        for (key, down) in [
-            (RemoteKey::PlayPause, &mut self.play_down),
-            (RemoteKey::Menu, &mut self.menu_down),
-        ] {
-            if *down {
+        for key in RemoteKey::ALL {
+            if self.keys_down & key.mask() != 0 {
                 self.sink.emit(Output::RemoteKey { key, down: false });
-                *down = false;
             }
         }
+        self.keys_down = 0;
         if self.button_down {
             self.sink.emit(Output::Key {
                 button: self.button_code,

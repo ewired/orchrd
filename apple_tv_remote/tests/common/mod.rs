@@ -176,6 +176,16 @@ impl Recorder {
             })
             .collect()
     }
+
+    pub fn remote_key(&self, key: RemoteKey) -> Vec<bool> {
+        self.events
+            .iter()
+            .filter_map(|event| match event {
+                Recorded::RemoteKey(found, down) if *found == key => Some(*down),
+                _ => None,
+            })
+            .collect()
+    }
 }
 
 /// A touchpad driven by synthetic reports, with the results recorded instead of

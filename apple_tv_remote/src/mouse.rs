@@ -11,6 +11,9 @@ pub const DEVICE_NAME: &str = "Apple TV Remote Touch Mouse";
 impl RemoteKey {
     pub fn code(self) -> KeyCode {
         match self {
+            RemoteKey::Source => KeyCode::KEY_TAB,
+            RemoteKey::VolumeUp => KeyCode::KEY_VOLUMEUP,
+            RemoteKey::VolumeDown => KeyCode::KEY_VOLUMEDOWN,
             RemoteKey::PlayPause => KeyCode::KEY_ENTER,
             RemoteKey::Menu => KeyCode::KEY_1,
         }
@@ -26,8 +29,9 @@ impl VirtualMouse {
         let mut keys = AttributeSet::new();
         keys.insert(KeyCode::BTN_LEFT);
         keys.insert(KeyCode::BTN_RIGHT);
-        keys.insert(RemoteKey::PlayPause.code());
-        keys.insert(RemoteKey::Menu.code());
+        for key in RemoteKey::ALL {
+            keys.insert(key.code());
+        }
         let mut axes = AttributeSet::new();
         axes.insert(RelativeAxisCode::REL_X);
         axes.insert(RelativeAxisCode::REL_Y);
